@@ -2,31 +2,33 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
-    "idle",
-  );
+  const [password, setPassword] = useState("");
+  const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
+  const router = useRouter();
 
-  async function sendMagicLink(e: React.FormEvent) {
+  async function handleSignIn(e: React.FormEvent) {
     e.preventDefault();
-    setStatus("sending");
+    setStatus("loading");
     setError("");
+
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
+      password,
     });
+
     if (error) {
-      setError(error.message);
+      setError("Invalid email or password.");
       setStatus("error");
     } else {
-      setStatus("sent");
+      router.push("/");
+      router.refresh();
     }
   }
 
@@ -46,36 +48,52 @@ export default function LoginPage() {
             Sign in
           </h1>
           <p className="mt-2 text-[14px] text-ink-subtle">
-            We&apos;ll email you a magic link — no password needed.
+            Your personal job search dashboard.
           </p>
 
-          {status === "sent" ? (
-            <div className="mt-6 rounded-lg border border-hairline bg-surface-2 p-4 text-[14px] text-ink-muted">
-              Check <span className="text-ink">{email}</span> for a sign-in
-              link. You can close this tab.
-            </div>
-          ) : (
-            <form onSubmit={sendMagicLink} className="mt-6 space-y-3">
+          <form onSubmit={handleSignIn} className="mt-6 space-y-3">
+            <div>
+              <label className="mb-1.5 block text-[13px] font-medium text-ink-subtle">
+                Email
+              </label>
               <input
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 className="w-full rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-[15px] text-ink placeholder:text-ink-tertiary outline-none focus:border-hairline-strong"
               />
-              <button
-                type="submit"
-                disabled={status === "sending"}
-                className="w-full rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-60"
-              >
-                {status === "sending" ? "Sending…" : "Send magic link"}
-              </button>
-              {status === "error" && (
-                <p className="text-[13px] text-red-400">{error}</p>
-              )}
-            </form>
-          )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-[13px] font-medium text-ink-subtle">
+                Password
+              </label>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full rounded-lg border border-hairline bg-surface-2 px-3 py-2 text-[15px] text-ink placeholder:text-ink-tertiary outline-none focus:border-hairline-strong"
+              />
+            </div>
+
+            {status === "error" && (
+              <p className="text-[13px] text-red-400">{error}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={status === "loading"}
+              className="w-full rounded-lg bg-primary px-3.5 py-2.5 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-60"
+            >
+              {status === "loading" ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
         </div>
       </main>
     </div>
