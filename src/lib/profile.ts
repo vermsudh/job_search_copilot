@@ -30,5 +30,5 @@ export async function saveProfile(
     .from("profiles")
     .upsert({ user_id: user.id, ...patch }, { onConflict: "user_id" });
 
-  if (error) throw error;
+  if (error) throw new Error(error.message);
 }

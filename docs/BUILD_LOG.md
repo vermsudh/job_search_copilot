@@ -175,4 +175,27 @@ npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities @supabase/supabas
 - `npm run build` clean — all 7 routes compile.
 - Active nav, empty state, and animations visible in user's browser.
 
+---
+
+## Step 8 — Auth switch (magic-link → email/password) + PDF resume upload
+
+**What was built**
+- **Email/password login**: replaced `signInWithOtp` magic-link flow with `signInWithPassword`. Login page (`/login/page.tsx`) now takes email + password fields; on success pushes to `/` and refreshes the router session. Account is created via Supabase Dashboard (password hashed by Supabase Auth).
+- **PDF resume upload** (`/api/parse-resume` route + `SettingsForm` upload button): user can upload a `.pdf` file (≤5 MB), the server extracts text via `pdf-parse`, and populates the resume textarea automatically — no manual paste needed.
+- **pdf-parse CJS fix**: `pdf-parse` is a CommonJS module; Next.js ESM bundling caused `TypeError: pdfParse is not a function` with dynamic `import()`. Fixed by using `createRequire(import.meta.url)` to force CJS resolution.
+
+**Approach / notes**
+- `createRequire` from Node's built-in `"module"` package is the idiomatic way to `require()` a CJS module from within an ESM/Next.js route handler without ejecting to a custom webpack config.
+- The route validates the Supabase session (401 if not logged in), enforces PDF MIME type + 5 MB size limit, and collapses excessive blank lines in the extracted text before returning it.
+- `SettingsForm` handles the upload lifecycle with `pdfStatus` state (`idle | uploading | error`) and resets the file input after each attempt so the same file can be re-uploaded.
+
+**Files touched**
+- `src/app/login/page.tsx` — rewritten from magic-link to email/password
+- `src/app/api/parse-resume/route.ts` — new route; pdf-parse with createRequire fix
+- `src/app/settings/SettingsForm.tsx` — PDF upload button + status UI wired to `/api/parse-resume`
+
+**Verification**
+- `npm run build` clean — all 7 routes compile including `/api/parse-resume`.
+- Email/password sign-in works; user confirmed successful sign-in via their own browser.
+- PDF upload: file → POST `/api/parse-resume` → extracted text populates textarea.
 

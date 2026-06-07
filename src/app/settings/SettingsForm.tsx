@@ -9,31 +9,30 @@ export default function SettingsForm({
 }: {
   initialProfile: Profile | null;
 }) {
-  const [fullName, setFullName] = useState(
-    initialProfile?.full_name ?? "",
-  );
+  const [fullName, setFullName] = useState(initialProfile?.full_name ?? "");
   const [resumeText, setResumeText] = useState(
     initialProfile?.resume_text ?? "",
   );
-  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
-  const [error, setError] = useState("");
+  const [saveStatus, setSaveStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [saveError, setSaveError] = useState("");
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    setStatus("saving");
-    setError("");
+    setSaveStatus("saving");
+    setSaveError("");
     try {
       await saveProfile({
         full_name: fullName.trim() || null,
         resume_text: resumeText.trim(),
       });
-      setStatus("saved");
-      setTimeout(() => setStatus("idle"), 2500);
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save.");
-      setStatus("error");
+      const msg = err instanceof Error ? err.message : String(err);
+      setSaveError(msg || "Failed to save.");
+      setSaveStatus("error");
     }
   }
 
@@ -43,9 +42,7 @@ export default function SettingsForm({
     <form onSubmit={handleSave} className="space-y-6">
       {/* Full name */}
       <div className="rounded-xl border border-hairline bg-surface-1 p-6">
-        <label className="mb-1.5 block text-[14px] font-medium">
-          Full name
-        </label>
+        <label className="mb-1 block text-[14px] font-medium">Full name</label>
         <p className="mb-3 text-[13px] text-ink-subtle">
           Used in the cover letter salutation.
         </p>
@@ -60,41 +57,44 @@ export default function SettingsForm({
 
       {/* Resume */}
       <div className="rounded-xl border border-hairline bg-surface-1 p-6">
-        <label className="mb-1.5 block text-[14px] font-medium">
-          Base resume
-        </label>
-        <p className="mb-3 text-[13px] text-ink-subtle">
-          Paste your full resume text. Every kit generation uses this to tailor
-          the cover letter and rewrite resume bullets for the specific role.
-        </p>
+        <div className="mb-4">
+          <label className="block text-[14px] font-medium">
+            Base resume
+          </label>
+          <p className="mt-1 text-[13px] text-ink-subtle">
+            Paste your resume text here — skills, experience, education,
+            projects. Used to tailor every kit to your background.
+          </p>
+        </div>
+
         <textarea
           rows={16}
           value={resumeText}
           onChange={(e) => setResumeText(e.target.value)}
-          placeholder="Paste your resume here — skills, experience, education, projects…"
-          className="w-full resize-y rounded-lg border border-hairline bg-surface-2 px-3 py-2.5 text-[14px] leading-relaxed text-ink placeholder:text-ink-tertiary outline-none focus:border-hairline-strong font-mono text-[13px]"
+          placeholder="Upload your PDF above, or paste your resume text here — skills, experience, education, projects…"
+          className="w-full resize-y rounded-lg border border-hairline bg-surface-2 px-3 py-2.5 font-mono text-[13px] leading-relaxed text-ink placeholder:text-ink-tertiary outline-none focus:border-hairline-strong"
         />
         <p className="mt-1.5 text-right text-[12px] text-ink-tertiary">
           {charCount.toLocaleString()} characters
         </p>
       </div>
 
-      {/* Save row */}
+      {/* Save */}
       <div className="flex items-center justify-between">
         <div>
-          {status === "error" && (
-            <p className="text-[13px] text-red-400">{error}</p>
+          {saveStatus === "error" && (
+            <p className="text-[13px] text-red-400">{saveError}</p>
           )}
-          {status === "saved" && (
-            <p className="text-[13px] text-success">✓ Saved</p>
+          {saveStatus === "saved" && (
+            <p className="text-[13px] text-success">✓ Profile saved</p>
           )}
         </div>
         <button
           type="submit"
-          disabled={status === "saving"}
+          disabled={saveStatus === "saving"}
           className="rounded-lg bg-primary px-5 py-2.5 text-[14px] font-medium text-on-primary transition-colors hover:bg-primary-hover disabled:opacity-60"
         >
-          {status === "saving" ? "Saving…" : "Save profile"}
+          {saveStatus === "saving" ? "Saving…" : "Save profile"}
         </button>
       </div>
     </form>
