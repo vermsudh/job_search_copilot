@@ -15,9 +15,11 @@ import {
 import { arrayMove } from "@dnd-kit/sortable";
 import type { Job, JobStatus } from "@/lib/types";
 import { JOB_STATUSES } from "@/lib/types";
-import { createJob, persistOrder } from "@/lib/jobs";
+import { persistOrder } from "@/lib/jobs";
 import Column from "./Column";
 import { JobCardBody } from "./JobCard";
+import AddJobModal from "./AddJobModal";
+import CardDrawer from "./CardDrawer";
 
 type Columns = Record<JobStatus, Job[]>;
 
@@ -38,6 +40,8 @@ function group(jobs: Job[]): Columns {
 export default function Board({ initialJobs }: { initialJobs: Job[] }) {
   const [columns, setColumns] = useState<Columns>(() => group(initialJobs));
   const [activeJob, setActiveJob] = useState<Job | null>(null);
+  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const sourceContainer = useRef<JobStatus | null>(null);
 
   const sensors = useSensors(
@@ -53,7 +57,7 @@ export default function Board({ initialJobs }: { initialJobs: Job[] }) {
     const id = String(e.active.id);
     const container = findContainer(id);
     sourceContainer.current = container ?? null;
-    const job = container?.length
+    const job = container
       ? columns[container].find((j) => j.id === id) ?? null
       : null;
     setActiveJob(job);
@@ -100,7 +104,6 @@ export default function Board({ initialJobs }: { initialJobs: Job[] }) {
     if (!dest) return;
 
     let next = columns;
-    // Reorder within the destination column.
     const overContainer = findContainer(overId);
     if (overContainer === dest) {
       const items = columns[dest];
@@ -112,7 +115,6 @@ export default function Board({ initialJobs }: { initialJobs: Job[] }) {
       }
     }
 
-    // Persist source + destination columns with reindexed sort_order.
     const affected = new Set<JobStatus>([dest]);
     if (source) affected.add(source);
     const updates: { id: string; status: JobStatus; sort_order: number }[] = [];
@@ -124,35 +126,71 @@ export default function Board({ initialJobs }: { initialJobs: Job[] }) {
     if (updates.length) persistOrder(updates).catch(console.error);
   }
 
-  async function quickAdd() {
-    const order = columns.wishlist.length;
-    const job = await createJob({
-      title: "New role",
-      company: "",
-      url: null,
-      description: "",
-      status: "wishlist",
-      sort_order: order,
-    });
-    setColumns((prev) => ({ ...prev, wishlist: [...prev.wishlist, job] }));
+  function handleJobCreated(job: Job) {
+    setColumns((prev) => ({
+      ...prev,
+      [job.status]: [...prev[job.status], job],
+    }));
   }
 
-  function openJob(job: Job) {
-    // Card detail drawer arrives in the next step.
-    console.log("open", job.id);
+  function handleJobUpdated(updated: Job) {
+    setColumns((prev) => {
+      const col = prev[updated.status];
+      return {
+        ...prev,
+        [updated.status]: col.map((j) => (j.id === updated.id ? updated : j)),
+      };
+    });
+    setSelectedJob(updated);
   }
+
+  function handleJobDeleted(id: string) {
+    setColumns((prev) => {
+      const next = { ...prev } as Columns;
+      for (const s of JOB_STATUSES) {
+        next[s] = next[s].filter((j) => j.id !== id);
+      }
+      return next;
+    });
+  }
+
+  const totalJobs = JOB_STATUSES.reduce((n, s) => n + columns[s].length, 0);
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] px-6 py-8">
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-20 pt-8 sm:px-6 sm:pb-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-[22px] font-semibold tracking-[-0.4px]">Pipeline</h1>
+        <h1 className="text-[22px] font-semibold tracking-[-0.4px]">
+          Pipeline
+        </h1>
         <button
-          onClick={quickAdd}
+          onClick={() => setAddModalOpen(true)}
           className="rounded-lg bg-primary px-3.5 py-2 text-sm font-medium text-on-primary transition-colors hover:bg-primary-hover"
         >
-          Add job
+          + Add job
         </button>
       </div>
+
+      {/* Empty state */}
+      {totalJobs === 0 && (
+        <div className="mb-8 flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline-strong py-16 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-surface-2">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-ink-subtle">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <path d="M8 21h8M12 17v4" />
+            </svg>
+          </div>
+          <p className="text-[15px] font-medium text-ink">Start tracking your search</p>
+          <p className="mt-1 max-w-xs text-[13px] text-ink-subtle">
+            Add your first job — paste a description, get a tailored cover letter, resume bullets, and interview prep in seconds.
+          </p>
+          <button
+            onClick={() => setAddModalOpen(true)}
+            className="mt-5 rounded-lg bg-primary px-4 py-2 text-[14px] font-medium text-on-primary transition-colors hover:bg-primary-hover"
+          >
+            + Add your first job
+          </button>
+        </div>
+      )}
 
       <DndContext
         sensors={sensors}
@@ -167,19 +205,32 @@ export default function Board({ initialJobs }: { initialJobs: Job[] }) {
               key={status}
               status={status}
               jobs={columns[status]}
-              onOpenJob={openJob}
+              onOpenJob={setSelectedJob}
             />
           ))}
         </div>
 
         <DragOverlay>
           {activeJob ? (
-            <div className="rounded-lg border border-hairline-strong bg-surface-2 p-3">
+            <div className="rounded-lg border border-hairline-strong bg-surface-2 p-3 shadow-lg">
               <JobCardBody job={activeJob} />
             </div>
           ) : null}
         </DragOverlay>
       </DndContext>
+
+      <AddJobModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onCreated={handleJobCreated}
+      />
+
+      <CardDrawer
+        job={selectedJob}
+        onClose={() => setSelectedJob(null)}
+        onJobUpdated={handleJobUpdated}
+        onJobDeleted={handleJobDeleted}
+      />
     </div>
   );
 }

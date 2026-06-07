@@ -90,4 +90,89 @@ npm install @dnd-kit/core @dnd-kit/sortable @dnd-kit/utilities @supabase/supabas
 - `npm run build` clean.
 - Interactive board verification (drag/reorder/persist) requires auth, which is gated on Supabase setup — bundled with Step 2 verification once env vars are in place.
 
+---
+
+## Step 4 — Add Job modal + Card detail drawer
+
+**What was built**
+- `AddJobModal`: paste JD (required), optional URL, title/company (with ✦ Auto-extract calling `/api/parse-job`), pipeline column picker. Creates a job via `createJob` and appends it to the board without a page reload.
+- `CardDrawer`: right-side slide-in drawer showing role, company, status badge, clickable posting URL, collapsible JD, and the **Generate Kit** button. Displays all four kit sections (Cover Letter, Resume Bullets, Interview Questions, Company Brief) each with a copy-to-clipboard button. Regenerate overwrites. Delete with confirm guard.
+- `Modal`: reusable backdrop+panel component (Escape to close, click-outside to close).
+- `Board` updated: temp quick-add replaced with real modal, `openJob` replaced by `setSelectedJob`; `handleJobCreated/Updated/Deleted` keep board state in sync without refetching.
+- `ThemeToggle` hydration fix: `mounted` flag prevents server/client mismatch.
+
+**Approach / notes**
+- The drawer is a fixed `aside` with its own backdrop div — no portal needed since Next.js renders it at the body level naturally.
+- Copy-to-clipboard flips "Copy" → "Copied!" for 2 s via local state; no library needed.
+- Delete shows an inline confirm row rather than a disruptive modal.
+- `handleJobUpdated` in Board also keeps `selectedJob` in sync so kit display refreshes immediately after generation.
+
+**Files touched**
+- `src/components/ui/Modal.tsx` (new)
+- `src/components/board/AddJobModal.tsx` (new)
+- `src/components/board/CardDrawer.tsx` (new)
+- `src/components/board/Board.tsx` (updated)
+- `src/components/ThemeToggle.tsx` (hydration fix)
+
+**Verification**
+- `npm run build` clean.
+- Board verified in user's own browser (auth works, GET / returns 200). Modal and drawer visually pending sign-in; Gemini buttons pending Step 6.
+
+---
+
+## Step 5 — Settings / resume profile page
+
+**What was built**
+- `/settings` server page: fetches the user's profile row and passes it to `SettingsForm`.
+- `SettingsForm` client component: full name input + large resume textarea (mono font, resizable) with character count. Saves via `saveProfile` (upsert to `profiles` table). Shows ✓ Saved confirmation for 2.5 s.
+- `src/lib/profile.ts`: `getProfile` + `saveProfile` browser-client helpers.
+
+**Files touched**
+- `src/app/settings/page.tsx`, `src/app/settings/SettingsForm.tsx`, `src/lib/profile.ts`
+
+**Verification**
+- `npm run build` clean. Live verification pending sign-in.
+
+---
+
+## Step 6 — Gemini route handlers (Generate Kit + Parse Job)
+
+**What was built**
+- `/api/parse-job` (POST): validates Supabase session → sends pasted JD to `gemini-2.0-flash` → returns `{ title, company }`. Strips markdown fences from response. Powers the ✦ Auto-extract button in AddJobModal.
+- `/api/generate-kit` (POST `{ jobId }`): validates session → re-reads job + profile from Supabase server-side (prompt can't be tampered via client) → one Gemini call with a structured JSON schema → returns and persists `KitData` (`coverLetter`, `resumeBullets[]`, `interviewQuestions[]`, `companyBrief`, `generatedAt`) to `jobs.kit`. Uses `responseMimeType: "application/json"` + `responseSchema` for reliable structured output.
+- Both handlers return 401 for unauthenticated requests (Gemini credits protected).
+
+**Security note**: `GEMINI_API_KEY` is only read in route handlers (server env), never in `NEXT_PUBLIC_*`. The prompt content is read from the DB server-side so a malicious client can't inject arbitrary text into the LLM call.
+
+**Files touched**
+- `src/app/api/parse-job/route.ts`, `src/app/api/generate-kit/route.ts`
+
+**Verification**
+- `npm run build` clean — all 7 routes compile (/, /login, /settings, /auth/callback, /api/generate-kit, /api/parse-job).
+- End-to-end Gemini verification pending user sign-in + profile save + Generate Kit click.
+
+---
+
+## Step 7 — Polish: nav, responsive, empty state, animations
+
+**What was built**
+- **Active nav links** — `NavLinks` client component uses `usePathname` to highlight the current page (Board / Settings) with `bg-surface-2 text-ink` on the active item.
+- **Mobile bottom nav** — a fixed bottom bar appears on `< sm` breakpoints with Board/Settings links (active-aware). Board and Settings pages use `pb-20 sm:pb-8` to avoid content being hidden under it.
+- **Empty board state** — when zero jobs exist, shows a centered card with an icon, headline, subtext, and a primary "Add your first job" button above the column grid.
+- **Column drop highlight** — "is over" state uses `border-primary/30 bg-surface-2` for a cleaner lavender-tinted highlight instead of opacity hacks.
+- **Drawer slide-in** — `animate-in slide-in-from-right duration-200` (Tailwind v4 built-in) on the `<aside>`.
+- **Modal entrance** — `animate-in fade-in zoom-in-95 duration-150` on the panel + auto-focus on first focusable input (50 ms delay to let the DOM settle).
+
+**Files touched**
+- `src/components/NavLinks.tsx` (new), `src/components/AppHeader.tsx`
+- `src/components/board/Board.tsx` (empty state, mobile padding)
+- `src/components/board/Column.tsx` (drop highlight)
+- `src/components/board/CardDrawer.tsx` (slide-in)
+- `src/components/ui/Modal.tsx` (entrance animation, auto-focus)
+- `src/app/settings/page.tsx` (mobile padding)
+
+**Verification**
+- `npm run build` clean — all 7 routes compile.
+- Active nav, empty state, and animations visible in user's browser.
+
 

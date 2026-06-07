@@ -42,8 +42,8 @@ export default function Column({
         ref={setNodeRef}
         className={`flex flex-1 flex-col gap-2 rounded-xl border p-2 transition-colors ${
           isOver
-            ? "border-hairline-strong bg-surface-1"
-            : "border-hairline bg-surface-1/40"
+            ? "border-primary/30 bg-surface-2"
+            : "border-hairline bg-surface-1"
         }`}
       >
         <SortableContext

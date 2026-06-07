@@ -6,10 +6,12 @@ type Theme = "dark" | "light";
 
 export default function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>("dark");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const stored = (localStorage.getItem("theme") as Theme | null) ?? "dark";
     setTheme(stored);
+    setMounted(true);
   }, []);
 
   function toggle() {
@@ -21,6 +23,12 @@ export default function ThemeToggle() {
     } else {
       document.documentElement.removeAttribute("data-theme");
     }
+  }
+
+  if (!mounted) {
+    return (
+      <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-hairline bg-surface-1 text-ink-subtle" />
+    );
   }
 
   return (
